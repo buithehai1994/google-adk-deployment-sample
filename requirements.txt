@@ -1,0 +1,24 @@
+fastapi
+fastapi-mcp
+uvicorn[standard]
+python-dotenv
+pydantic
+torch
+clip @ git+https://github.com/openai/CLIP.git
+easyocr
+Pillow
+pdf2image
+qdrant-client
+numpy
+python-multipart
+werkzeug
+python-dotenv
+requests
+PyYAML
+google-adk
+google-generativeai
+pymupdf
+nest_asyncio
+langchain_text_splitters
+watchdog
+pinecone-text
