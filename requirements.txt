@@ -1,5 +1,6 @@
 fastapi
 fastapi-mcp
+faiss-cpu
 uvicorn[standard]
 python-dotenv
 pydantic
@@ -12,7 +13,6 @@ qdrant-client
 numpy
 python-multipart
 werkzeug
-python-dotenv
 requests
 PyYAML
 google-adk
@@ -22,3 +22,4 @@ nest_asyncio
 langchain_text_splitters
 watchdog
 pinecone-text
+mcp
