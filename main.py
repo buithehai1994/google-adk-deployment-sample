@@ -1,11 +1,10 @@
 import os
 import uvicorn
-from fastapi import FastAPI, Request, HTTPException
+from fastapi import FastAPI, Request, HTTPException, Depends
 from fastapi.responses import JSONResponse
 from fastapi.openapi.docs import get_swagger_ui_html, get_redoc_html
 from google.adk.cli.fast_api import get_fast_api_app
 from starlette.middleware.base import BaseHTTPMiddleware 
-
 from dotenv import load_dotenv
 
 load_dotenv()
@@ -55,13 +54,28 @@ app.openapi_url = None
 
 class APIKeyMiddleware(BaseHTTPMiddleware):
     async def dispatch(self, request: Request, call_next):
-        key = request.headers.get("x-api-key")  # Use fixed header name "x-api-key"
+        # Allow docs routes through (they still work inside Swagger UI with API key)
+        if request.url.path in ["/docs", "/redoc", "/openapi.json"]:
+            return await call_next(request)
+
+        key = request.headers.get("x-api-key")
         if key != API_KEY:
             return JSONResponse({"detail": "Unauthorized"}, status_code=401)
         return await call_next(request)
-    
+
+
 # Add middleware to protect all endpoints
 app.add_middleware(APIKeyMiddleware)
+
+# ----------------------------
+# Verify API Key dependency
+# ----------------------------
+
+def verify_api_key(request: Request):
+    key = request.headers.get("x-api-key")
+    if key != API_KEY:
+        raise HTTPException(status_code=401, detail="Unauthorized")
+    return True
 
 # ----------------------------
 # Custom protected docs
@@ -78,6 +92,7 @@ def custom_redoc_html():
 @app.get("/openapi.json", include_in_schema=False)
 def openapi_json():
     return JSONResponse(app.openapi())
+
 
 # ----------------------------
 # Run Uvicorn
