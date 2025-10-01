@@ -1,6 +1,6 @@
 import os
 import uvicorn
-from fastapi import FastAPI, Request
+from fastapi import FastAPI, Request, HTTPException, Depends
 from fastapi.responses import JSONResponse
 from fastapi.openapi.docs import get_swagger_ui_html, get_redoc_html
 from google.adk.cli.fast_api import get_fast_api_app
@@ -12,11 +12,10 @@ load_dotenv()
 # ----------------------------
 # Configuration
 # ----------------------------
-
 AGENT_DIR = os.path.dirname(os.path.abspath(__file__))
 DATABASE_DIR = os.path.join(AGENT_DIR, "database")
 SESSION_SERVICE_URI = f"sqlite:///{os.path.join(DATABASE_DIR, 'adk.db')}"
-ALLOWED_ORIGINS = ["http://localhost", "http://localhost:8080", "*"]
+ALLOWED_ORIGINS = ["http://localhost", "http://localhost:8080"]
 SERVE_WEB_INTERFACE = True
 
 API_KEY = os.getenv("CREDENTIALS")
@@ -24,9 +23,8 @@ if not API_KEY:
     raise RuntimeError("CREDENTIALS variable is not set")
 
 # ----------------------------
-# Create FastAPI app
+# FastAPI app
 # ----------------------------
-
 app: FastAPI = get_fast_api_app(
     agents_dir=AGENT_DIR,
     session_service_uri=SESSION_SERVICE_URI,
@@ -37,33 +35,27 @@ app: FastAPI = get_fast_api_app(
 # ----------------------------
 # API Key Middleware
 # ----------------------------
-
 class APIKeyMiddleware(BaseHTTPMiddleware):
     async def dispatch(self, request: Request, call_next):
-        # Allow docs routes to load without blocking
-        if request.url.path in ["/docs", "/docs/", "/redoc", "/redoc/", "/openapi.json"]:
+        # Exempt OpenAPI/Swagger static paths but still protect API endpoints
+        exempt_paths = []
+        if any(request.url.path.startswith(p) for p in exempt_paths):
             return await call_next(request)
 
         key = request.headers.get("x-api-key")
         if key != API_KEY:
             return JSONResponse({"detail": "Unauthorized"}, status_code=401)
+
         return await call_next(request)
 
 app.add_middleware(APIKeyMiddleware)
 
 # ----------------------------
-# Custom Swagger UI
+# Swagger / ReDoc with API Key prompt
 # ----------------------------
-
 @app.get("/docs", include_in_schema=False)
 @app.get("/docs/", include_in_schema=False)
 def custom_swagger_ui_html():
-    """
-    Swagger UI for API testing.
-    After loading, click the 🔒 'Authorize' button and enter:
-        Name: x-api-key
-        Value: <your API key>
-    """
     return get_swagger_ui_html(
         openapi_url="/openapi.json",
         title="API Docs",
@@ -82,7 +74,6 @@ def openapi_json():
 # ----------------------------
 # Run Uvicorn
 # ----------------------------
-
 if __name__ == "__main__":
     port = int(os.environ.get("PORT", 8080))
     uvicorn.run(app, host="0.0.0.0", port=port)
