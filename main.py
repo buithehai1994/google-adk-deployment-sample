@@ -1,10 +1,10 @@
 import os
 import uvicorn
-from fastapi import FastAPI, Request, HTTPException, Depends
+from fastapi import FastAPI, Request
 from fastapi.responses import JSONResponse
 from fastapi.openapi.docs import get_swagger_ui_html, get_redoc_html
 from google.adk.cli.fast_api import get_fast_api_app
-from starlette.middleware.base import BaseHTTPMiddleware 
+from starlette.middleware.base import BaseHTTPMiddleware
 from dotenv import load_dotenv
 
 load_dotenv()
@@ -13,21 +13,12 @@ load_dotenv()
 # Configuration
 # ----------------------------
 
-# Directory where this file is located
 AGENT_DIR = os.path.dirname(os.path.abspath(__file__))
-
 DATABASE_DIR = os.path.join(AGENT_DIR, "database")
-
-# Example session service URI (SQLite)
 SESSION_SERVICE_URI = f"sqlite:///{os.path.join(DATABASE_DIR, 'adk.db')}"
-
-# Allowed origins for CORS
 ALLOWED_ORIGINS = ["http://localhost", "http://localhost:8080", "*"]
-
-# Serve web interface or not
 SERVE_WEB_INTERFACE = True
 
-# API Key (must be set as an environment variable)
 API_KEY = os.getenv("CREDENTIALS")
 if not API_KEY:
     raise RuntimeError("CREDENTIALS variable is not set")
@@ -43,19 +34,14 @@ app: FastAPI = get_fast_api_app(
     web=SERVE_WEB_INTERFACE,
 )
 
-# Disable default docs
-app.docs_url = None
-app.redoc_url = None
-app.openapi_url = None
-
 # ----------------------------
 # API Key Middleware
 # ----------------------------
 
 class APIKeyMiddleware(BaseHTTPMiddleware):
     async def dispatch(self, request: Request, call_next):
-        # Allow docs routes through (they still work inside Swagger UI with API key)
-        if request.url.path in ["/docs", "/redoc", "/openapi.json"]:
+        # Allow docs routes to load without blocking
+        if request.url.path in ["/docs", "/docs/", "/redoc", "/redoc/", "/openapi.json"]:
             return await call_next(request)
 
         key = request.headers.get("x-api-key")
@@ -63,36 +49,35 @@ class APIKeyMiddleware(BaseHTTPMiddleware):
             return JSONResponse({"detail": "Unauthorized"}, status_code=401)
         return await call_next(request)
 
-
-# Add middleware to protect all endpoints
 app.add_middleware(APIKeyMiddleware)
 
 # ----------------------------
-# Verify API Key dependency
-# ----------------------------
-
-def verify_api_key(request: Request):
-    key = request.headers.get("x-api-key")
-    if key != API_KEY:
-        raise HTTPException(status_code=401, detail="Unauthorized")
-    return True
-
-# ----------------------------
-# Custom protected docs
+# Custom Swagger UI
 # ----------------------------
 
 @app.get("/docs", include_in_schema=False)
+@app.get("/docs/", include_in_schema=False)
 def custom_swagger_ui_html():
-    return get_swagger_ui_html(openapi_url="/openapi.json", title="API Docs")
+    """
+    Swagger UI for API testing.
+    After loading, click the 🔒 'Authorize' button and enter:
+        Name: x-api-key
+        Value: <your API key>
+    """
+    return get_swagger_ui_html(
+        openapi_url="/openapi.json",
+        title="API Docs",
+        swagger_favicon_url="https://fastapi.tiangolo.com/img/favicon.png"
+    )
 
 @app.get("/redoc", include_in_schema=False)
+@app.get("/redoc/", include_in_schema=False)
 def custom_redoc_html():
     return get_redoc_html(openapi_url="/openapi.json", title="API Docs")
 
 @app.get("/openapi.json", include_in_schema=False)
 def openapi_json():
     return JSONResponse(app.openapi())
-
 
 # ----------------------------
 # Run Uvicorn
