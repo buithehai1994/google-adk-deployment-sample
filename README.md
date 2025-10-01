@@ -34,7 +34,11 @@ gcloud config set account YOUR_EMAIL@gmail.com
 gcloud config set run/region us-central1
 ```
 
-### 1.5 Verify Configuration
+
+### 1.5 Set IAM
+gcloud projects add-iam-policy-binding sage-tribute-317903 --member="serviceAccount:partner-sa@sage-tribute-317903.iam.gserviceaccount.com" --role=roles/datastore.user
+
+### 1.6 Verify Configuration
 ```bash
 gcloud config list
 ```
@@ -75,8 +79,9 @@ Ensure you're in the directory containing your `Dockerfile`.
 
 ### Windows (CMD) - Single Line
 ```cmd
-gcloud run deploy multitool-agent-service --source . --region %GOOGLE_CLOUD_LOCATION% --memory=2Gi --cpu=2 --timeout=300s --allow-unauthenticated --set-env-vars="GOOGLE_CLOUD_PROJECT=%GOOGLE_CLOUD_PROJECT%,GOOGLE_CLOUD_LOCATION=%GOOGLE_CLOUD_LOCATION%,GOOGLE_GENAI_USE_VERTEXAI=%GOOGLE_GENAI_USE_VERTEXAI%,GCLOUD_API_KEY=%GCLOUD_API_KEY%"
+gcloud run deploy multitool-agent-service --source . --region %GOOGLE_CLOUD_LOCATION% --memory=2Gi --cpu=2 --timeout=300s --no-allow-unauthenticated --service-account=partner-sa@%GOOGLE_CLOUD_PROJECT%.iam.gserviceaccount.com --set-env-vars="GOOGLE_CLOUD_PROJECT=%GOOGLE_CLOUD_PROJECT%,GOOGLE_CLOUD_LOCATION=%GOOGLE_CLOUD_LOCATION%,GOOGLE_GENAI_USE_VERTEXAI=%GOOGLE_GENAI_USE_VERTEXAI%,CREDENTIALS=%CREDENTIALS%,GCLOUD_API_KEY=%GCLOUD_API_KEY%"
 ```
+
 
 ### Windows (CMD) - Multi-Line
 ```cmd
@@ -229,6 +234,7 @@ gcloud run deploy YOUR_SERVICE_NAME ^
   --allow-unauthenticated ^
   --set-env-vars="GOOGLE_CLOUD_PROJECT=%GOOGLE_CLOUD_PROJECT%,GOOGLE_CLOUD_LOCATION=%GOOGLE_CLOUD_LOCATION%,GOOGLE_GENAI_USE_VERTEXAI=%GOOGLE_GENAI_USE_VERTEXAI%,GCLOUD_API_KEY=%GCLOUD_API_KEY%"
 ```
+Example: gcloud run deploy multitool-agent-service --source . --region %GOOGLE_CLOUD_LOCATION% --memory=2Gi --cpu=2 --timeout=300s --no-allow-unauthenticated --service-account=partner-sa@%GOOGLE_CLOUD_PROJECT%.iam.gserviceaccount.com --set-env-vars="GOOGLE_CLOUD_PROJECT=%GOOGLE_CLOUD_PROJECT%,GOOGLE_CLOUD_LOCATION=%GOOGLE_CLOUD_LOCATION%,GOOGLE_GENAI_USE_VERTEXAI=%GOOGLE_GENAI_USE_VERTEXAI%,GCLOUD_API_KEY=%GCLOUD_API_KEY%"
 
 ---
 

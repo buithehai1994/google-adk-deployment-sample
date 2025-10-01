@@ -1,24 +1,42 @@
 import os
-
 import uvicorn
-from fastapi import FastAPI
+from fastapi import FastAPI, Request, HTTPException
+from fastapi.responses import JSONResponse
+from fastapi.openapi.docs import get_swagger_ui_html, get_redoc_html
 from google.adk.cli.fast_api import get_fast_api_app
+from starlette.middleware.base import BaseHTTPMiddleware 
 
-# Get the directory where main.py is located
+from dotenv import load_dotenv
+
+load_dotenv()
+
+# ----------------------------
+# Configuration
+# ----------------------------
+
+# Directory where this file is located
 AGENT_DIR = os.path.dirname(os.path.abspath(__file__))
 
 DATABASE_DIR = os.path.join(AGENT_DIR, "database")
 
-# Example session service URI (e.g., SQLite)
+# Example session service URI (SQLite)
 SESSION_SERVICE_URI = f"sqlite:///{os.path.join(DATABASE_DIR, 'adk.db')}"
 
-# Example allowed origins for CORS
+# Allowed origins for CORS
 ALLOWED_ORIGINS = ["http://localhost", "http://localhost:8080", "*"]
-# Set web=True if you intend to serve a web interface, False otherwise
+
+# Serve web interface or not
 SERVE_WEB_INTERFACE = True
 
-# Call the function to get the FastAPI app instance
-# Ensure the agent directory name ('capital_agent') matches your agent folder
+# API Key (must be set as an environment variable)
+API_KEY = os.getenv("CREDENTIALS")
+if not API_KEY:
+    raise RuntimeError("CREDENTIALS variable is not set")
+
+# ----------------------------
+# Create FastAPI app
+# ----------------------------
+
 app: FastAPI = get_fast_api_app(
     agents_dir=AGENT_DIR,
     session_service_uri=SESSION_SERVICE_URI,
@@ -26,12 +44,45 @@ app: FastAPI = get_fast_api_app(
     web=SERVE_WEB_INTERFACE,
 )
 
-# You can add more FastAPI routes or configurations below if needed
-# Example:
-# @app.get("/hello")
-# async def read_root():
-#     return {"Hello": "World"}
+# Disable default docs
+app.docs_url = None
+app.redoc_url = None
+app.openapi_url = None
+
+# ----------------------------
+# API Key Middleware
+# ----------------------------
+
+class APIKeyMiddleware(BaseHTTPMiddleware):
+    async def dispatch(self, request: Request, call_next):
+        key = request.headers.get("x-api-key")  # Use fixed header name "x-api-key"
+        if key != API_KEY:
+            return JSONResponse({"detail": "Unauthorized"}, status_code=401)
+        return await call_next(request)
+    
+# Add middleware to protect all endpoints
+app.add_middleware(APIKeyMiddleware)
+
+# ----------------------------
+# Custom protected docs
+# ----------------------------
+
+@app.get("/docs", include_in_schema=False)
+def custom_swagger_ui_html():
+    return get_swagger_ui_html(openapi_url="/openapi.json", title="API Docs")
+
+@app.get("/redoc", include_in_schema=False)
+def custom_redoc_html():
+    return get_redoc_html(openapi_url="/openapi.json", title="API Docs")
+
+@app.get("/openapi.json", include_in_schema=False)
+def openapi_json():
+    return JSONResponse(app.openapi())
+
+# ----------------------------
+# Run Uvicorn
+# ----------------------------
 
 if __name__ == "__main__":
-    # Use the PORT environment variable provided by Cloud Run, defaulting to 8080
-    uvicorn.run(app, host="0.0.0.0", port=int(os.environ.get("PORT", 8080)))
+    port = int(os.environ.get("PORT", 8080))
+    uvicorn.run(app, host="0.0.0.0", port=port)
